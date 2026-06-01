@@ -88,22 +88,22 @@ namespace Singularity.Apps.Git {
 
             // Working-change actions live in the bubbles, before the drag/close.
             edit_btn = new Button.from_icon_name("document-edit-symbolic");
-            edit_btn.tooltip_text = "Edit in editor";
+            edit_btn.tooltip_text = _("Edit in editor");
             edit_btn.clicked.connect(() => { if (selected != null) open_in_editor(selected.path); });
             hover.add_control(edit_btn);
 
             stage_btn = new Button.from_icon_name("list-add-symbolic");
-            stage_btn.tooltip_text = "Stage";
+            stage_btn.tooltip_text = _("Stage");
             stage_btn.clicked.connect(() => act_stage());
             hover.add_control(stage_btn);
 
             unstage_btn = new Button.from_icon_name("list-remove-symbolic");
-            unstage_btn.tooltip_text = "Unstage";
+            unstage_btn.tooltip_text = _("Unstage");
             unstage_btn.clicked.connect(() => act_unstage());
             hover.add_control(unstage_btn);
 
             restore_btn = new Button.from_icon_name("edit-undo-symbolic");
-            restore_btn.tooltip_text = "Restore (discard changes)";
+            restore_btn.tooltip_text = _("Restore (discard changes)");
             restore_btn.clicked.connect(() => act_restore());
             hover.add_control(restore_btn);
 
@@ -115,7 +115,7 @@ namespace Singularity.Apps.Git {
             _actions_sep.add_css_class("singularity-hover-sep");
 
             var grip = new Button.from_icon_name("list-drag-handle-symbolic");
-            grip.tooltip_text = "Drag Window";
+            grip.tooltip_text = _("Drag Window");
             var grip_drag = new Gtk.GestureDrag();
             grip_drag.drag_begin.connect((x, y) => {
                 var surface = get_surface();
@@ -128,7 +128,7 @@ namespace Singularity.Apps.Git {
             hover.add_separator();
 
             var close_btn = new Button.from_icon_name("window-close-symbolic");
-            close_btn.tooltip_text = "Close";
+            close_btn.tooltip_text = _("Close");
             close_btn.clicked.connect(() => close());
             hover.add_control(close_btn);
 
@@ -228,19 +228,19 @@ namespace Singularity.Apps.Git {
                     break;
                 case "unstaged":
                     stage_btn.visible = true;
-                    stage_btn.tooltip_text = "Stage";
+                    stage_btn.tooltip_text = _("Stage");
                     unstage_btn.visible = false;
                     restore_btn.visible = true;
                     break;
                 case "untracked":
                     stage_btn.visible = true;
-                    stage_btn.tooltip_text = "Stage";
+                    stage_btn.tooltip_text = _("Stage");
                     unstage_btn.visible = false;
                     restore_btn.visible = false; // discard would delete a new file
                     break;
                 case "conflict":
                     stage_btn.visible = true;     // stage = mark resolved
-                    stage_btn.tooltip_text = "Mark resolved (stage)";
+                    stage_btn.tooltip_text = _("Mark resolved (stage)");
                     unstage_btn.visible = false;
                     restore_btn.visible = false;
                     break;

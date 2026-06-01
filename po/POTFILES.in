@@ -1,0 +1,7 @@
+# List of source files containing translatable strings.
+src/app.vala
+src/diff_view.vala
+src/diff_window.vala
+src/git_backend.vala
+src/main.vala
+src/window.vala
