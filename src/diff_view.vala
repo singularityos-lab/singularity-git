@@ -25,14 +25,16 @@ namespace Singularity.Apps.Git {
             scroll.vscrollbar_policy = PolicyType.AUTOMATIC;
 
             buffer = new GtkSource.Buffer(null);
-            view = new GtkSource.View.with_buffer(buffer);
-            view.editable = false;
-            view.cursor_visible = false;
-            view.monospace = true;
-            view.show_line_numbers = false;
-            view.left_margin = 8;
-            view.right_margin = 8;
-            view.add_css_class("git-diff-view");
+            var sv = new Singularity.Widgets.SourceView(buffer);
+            sv.editable = false;
+            sv.cursor_visible = false;
+            sv.show_line_numbers = false;
+            sv.top_margin = 0;
+            sv.bottom_margin = 0;
+            sv.left_margin = 8;
+            sv.right_margin = 8;
+            sv.add_css_class("git-diff-view");
+            view = sv;
             scroll.set_child(view);
             append(scroll);
 

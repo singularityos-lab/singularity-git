@@ -78,8 +78,7 @@ namespace Singularity.Apps.Git {
         .diff-add  { background-color: alpha(#33b35a, 0.18); }
         .diff-del  { background-color: alpha(#e05c5c, 0.18); }
         .diff-hunk { color: #3584e4; }
-        .git-commit-box { border-top: 1px solid alpha(@window_fg_color, 0.12);
-                          padding: 8px; }
+        .git-commit-box { border-top: 1px solid alpha(@window_fg_color, 0.12); }
         .git-toolbar-pill { background-color: alpha(@window_fg_color, 0.08);
                             border-radius: 999px; padding: 2px; }
         .git-conflict-banner { background-color: alpha(#e05c5c, 0.18);

@@ -44,7 +44,6 @@ namespace Singularity.Apps.Git {
             this.app = app;
             set_title("Git");
             set_default_size(1280, 800);
-            toolbar.is_static = true;
             build_ui();
         }
 
@@ -69,9 +68,6 @@ namespace Singularity.Apps.Git {
             content_stack.add_named(build_welcome(), "welcome");
             content_stack.add_named(outer, "main");
             content_stack.visible_child_name = "welcome";
-            // Breathing room under the toolbar (Store-style) so content isn't
-            // glued to the titlebar.
-            content_stack.margin_top = 6;
             set_content(content_stack);
         }
 
@@ -80,7 +76,6 @@ namespace Singularity.Apps.Git {
             wp.app_icon_name = "dev.sinty.git";
             wp.title = "Git";
             wp.subtitle = "Branches, commits, diffs and conflicts - across multiple repositories.";
-            wp.show_close_button = false;
             wp.add_action(
                 "folder-open-symbolic",
                 "Open Repository",
@@ -106,13 +101,19 @@ namespace Singularity.Apps.Git {
             open_btn.tooltip_text = "Open Repository…";
             open_btn.add_css_class("flat");
             open_btn.clicked.connect(on_open_repo);
-            toolbar.pack_start(open_btn);
+            add_bubble_widget(open_btn);
 
             refresh_btn = new Button.from_icon_name("view-refresh-symbolic");
             refresh_btn.tooltip_text = "Refresh";
             refresh_btn.add_css_class("flat");
             refresh_btn.clicked.connect(() => { if (current != null) reload_repo.begin(); });
-            toolbar.pack_start(refresh_btn);
+            add_bubble_widget(refresh_btn);
+
+            branch_btn = new Button.from_icon_name("list-add-symbolic");
+            branch_btn.tooltip_text = "New Branch…";
+            branch_btn.add_css_class("flat");
+            branch_btn.clicked.connect(on_new_branch);
+            add_bubble_widget(branch_btn);
 
             // Fetch = sync (mail-send-receive is the reliable sync glyph;
             // emblem-synchronizing-symbolic is missing in the theme, so it
@@ -121,25 +122,23 @@ namespace Singularity.Apps.Git {
             fetch_btn.tooltip_text = "Fetch";
             fetch_btn.add_css_class("flat");
             fetch_btn.clicked.connect(() => run_repo_op.begin("fetch"));
-            toolbar.pack_end(fetch_btn);
+            add_bubble_widget(fetch_btn);
 
             pull_btn = new Button.from_icon_name("folder-download-symbolic");
             pull_btn.tooltip_text = "Pull (fast-forward)";
             pull_btn.add_css_class("flat");
             pull_btn.clicked.connect(() => run_repo_op.begin("pull"));
-            toolbar.pack_end(pull_btn);
+            add_bubble_widget(pull_btn);
 
             push_btn = new Button.from_icon_name("send-to-symbolic");
             push_btn.tooltip_text = "Push";
             push_btn.add_css_class("flat");
             push_btn.clicked.connect(() => run_repo_op.begin("push"));
-            toolbar.pack_end(push_btn);
+            add_bubble_widget(push_btn);
 
-            branch_btn = new Button.from_icon_name("list-add-symbolic");
-            branch_btn.tooltip_text = "New Branch…";
-            branch_btn.add_css_class("flat");
-            branch_btn.clicked.connect(on_new_branch);
-            toolbar.pack_end(branch_btn);
+            add_bubble_icon("view-restore-symbolic",
+                            "Open diff in a separate window",
+                            () => detach_diff());
 
             update_toolbar_sensitivity();
         }
@@ -240,24 +239,10 @@ namespace Singularity.Apps.Git {
 
         private Widget build_details() {
             var box = new Box(Orientation.VERTICAL, 0);
+            box.margin_top = 5;
 
-            // Title row: title + a "pop out" button to detach the diff into
-            // its own window.
-            var title_row = new Box(Orientation.HORIZONTAL, 6);
-            title_row.margin_start = 12; title_row.margin_top = 10;
-            title_row.margin_end = 8; title_row.margin_bottom = 6;
+            // Kept for downstream `details_title.label = ...` calls but never appended.
             details_title = new Label("");
-            details_title.add_css_class("title-4");
-            details_title.halign = Align.START;
-            details_title.hexpand = true;
-            details_title.ellipsize = Pango.EllipsizeMode.END;
-            title_row.append(details_title);
-            var detach_btn = new Button.from_icon_name("view-restore-symbolic");
-            detach_btn.add_css_class("flat");
-            detach_btn.tooltip_text = "Open diff in a separate window";
-            detach_btn.clicked.connect(detach_diff);
-            title_row.append(detach_btn);
-            box.append(title_row);
 
             // Conflict banner (hidden unless conflicts).
             conflict_banner = new Box(Orientation.HORIZONTAL, 8);
@@ -271,21 +256,28 @@ namespace Singularity.Apps.Git {
             conflict_banner.append(cb_lbl);
             box.append(conflict_banner);
 
-            // File list (changed files for commit / working).
+            // shrink false + resize true on both children makes the Paned start at 50/50.
+            var split = new Paned(Orientation.VERTICAL);
+            split.shrink_start_child = false;
+            split.shrink_end_child   = false;
+            split.resize_start_child = true;
+            split.resize_end_child   = true;
+            split.vexpand = true;
+
             var files_scroll = new ScrolledWindow();
             files_scroll.hscrollbar_policy = PolicyType.NEVER;
-            files_scroll.min_content_height = 120;
-            files_scroll.max_content_height = 260;
-            files_scroll.propagate_natural_height = true;
+            files_scroll.propagate_natural_height = false;
+            files_scroll.vexpand = true;
             file_list_box = new Box(Orientation.VERTICAL, 1);
             file_list_box.margin_start = 6; file_list_box.margin_end = 6;
             files_scroll.set_child(file_list_box);
-            box.append(files_scroll);
+            split.set_start_child(files_scroll);
 
-            box.append(new Separator(Orientation.HORIZONTAL));
-
+            var bottom_box = new Box(Orientation.VERTICAL, 0);
+            bottom_box.vexpand = true;
             diff_view = new DiffView();
-            box.append(diff_view);
+            diff_view.vexpand = true;
+            bottom_box.append(diff_view);
 
             // Commit message box (working mode only).
             commit_revealer = new Revealer();
@@ -295,11 +287,29 @@ namespace Singularity.Apps.Git {
             commit_msg = new TextView();
             commit_msg.wrap_mode = WrapMode.WORD_CHAR;
             commit_msg.add_css_class("git-commit-msg");
+            // Placeholder via a sibling Label that hides as soon as the
+            // buffer has text. GtkTextView has no placeholder property.
+            var commit_overlay = new Overlay();
+            commit_overlay.set_child(commit_msg);
+            var commit_placeholder = new Label("Write a commit message...");
+            commit_placeholder.add_css_class("dim-label");
+            commit_placeholder.halign = Align.START;
+            commit_placeholder.valign = Align.START;
+            commit_placeholder.margin_top = 6;
+            commit_placeholder.margin_start = 8;
+            commit_placeholder.can_target = false;
+            commit_overlay.add_overlay(commit_placeholder);
+            commit_msg.buffer.changed.connect(() => {
+                commit_placeholder.visible = (commit_msg.buffer.text == "");
+            });
             var msg_scroll = new ScrolledWindow();
             msg_scroll.min_content_height = 56;
             msg_scroll.max_content_height = 120;
-            msg_scroll.set_child(commit_msg);
+            msg_scroll.set_child(commit_overlay);
             cbox.append(msg_scroll);
+
+            var crow_wrap = new Box(Orientation.VERTICAL, 0);
+            crow_wrap.margin_bottom = 6;
             var crow = new Box(Orientation.HORIZONTAL, 8);
             var stage_all_btn = new Button.with_label("Stage All");
             stage_all_btn.clicked.connect(() => {
@@ -314,9 +324,13 @@ namespace Singularity.Apps.Git {
             commit_btn.add_css_class("suggested-action");
             commit_btn.clicked.connect(on_commit);
             crow.append(commit_btn);
-            cbox.append(crow);
+            crow_wrap.append(crow);
+            cbox.append(crow_wrap);
             commit_revealer.set_child(cbox);
-            box.append(commit_revealer);
+            bottom_box.append(commit_revealer);
+
+            split.set_end_child(bottom_box);
+            box.append(split);
 
             return box;
         }
