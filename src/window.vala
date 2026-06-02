@@ -8,6 +8,7 @@ namespace Singularity.Apps.Git {
 
     public enum ViewMode { WORKING, COMMIT }
 
+    [GtkTemplate(ui = "/dev/sinty/git/ui/main.ui")]
     public class GitWindow : Singularity.Widgets.Window {
         private GitApp app;
 
@@ -20,24 +21,24 @@ namespace Singularity.Apps.Git {
         // Files currently shown in the details pane (for the detach window).
         private Gee.ArrayList<DiffFileRef> _current_files = new Gee.ArrayList<DiffFileRef>();
 
-        // Sidebar widgets.
-        private ListBox repo_list;
-        private Box     branches_box;     // holds local + remote sections
-        private Label   repo_status_lbl;
+        // Structural skeleton from ui/main.vetro.
+        [GtkChild] unowned Paned   git_main_root;
+        [GtkChild] unowned ListBox repo_list;
+        [GtkChild] unowned Box     branches_box;     // holds local + remote sections
+        [GtkChild] unowned Label   repo_status_lbl;
+        [GtkChild] unowned ListBox commit_list;
+        [GtkChild] unowned Button  working_btn;
+        [GtkChild] unowned Label   working_badge;
+        [GtkChild] unowned Box     file_list_box;
+        [GtkChild] unowned Box     conflict_banner;
+        [GtkChild] unowned Box     bottom_box;
 
-        // Center (commit log).
-        private ListBox commit_list;
-        private Button  working_btn;
-        private Label   working_badge;
-
-        // Right (details).
+        // Built in code (custom DiffView + dynamic commit box).
         private Label    details_title;
-        private Box      file_list_box;
         private DiffView diff_view;
         private Revealer commit_revealer;
         private TextView commit_msg;
         private Button   commit_btn;
-        private Box      conflict_banner;
 
         public GitWindow(GitApp app) {
             Object(application: app);
@@ -53,20 +54,21 @@ namespace Singularity.Apps.Git {
         private void build_ui() {
             setup_toolbar();
 
-            var outer = new Paned(Orientation.HORIZONTAL);
-            outer.position = 280;
-            outer.shrink_start_child = false;
-            outer.set_start_child(build_sidebar());
+            // The repo/branch/commit lists and the details panes come from
+            // ui/main.vetro (git_main_root). Wire their behaviour here.
+            repo_list.row_selected.connect((row) => {
+                if (row == null) return;
+                int idx = row.get_index();
+                if (idx >= 0 && idx < repos.size) select_repo(repos[idx]);
+            });
+            commit_list.row_activated.connect(on_commit_activated);
+            working_btn.clicked.connect(() => show_working_changes.begin());
 
-            var inner = new Paned(Orientation.HORIZONTAL);
-            inner.position = 460;
-            inner.set_start_child(build_center());
-            inner.set_end_child(build_details());
-            outer.set_end_child(inner);
+            build_details_extras();
 
             content_stack = new Stack();
             content_stack.add_named(build_welcome(), "welcome");
-            content_stack.add_named(outer, "main");
+            content_stack.add_named(git_main_root, "main");
             content_stack.visible_child_name = "welcome";
             set_content(content_stack);
         }
@@ -153,128 +155,13 @@ namespace Singularity.Apps.Git {
             if (branch_btn != null)  branch_btn.visible = has;
         }
 
-        private Widget build_sidebar() {
-            var box = new Box(Orientation.VERTICAL, 0);
-            box.width_request = 260;
-
-            var repos_lbl = new Label(_("REPOSITORIES"));
-            repos_lbl.add_css_class("git-section-label");
-            repos_lbl.halign = Align.START;
-            box.append(repos_lbl);
-
-            repo_list = new ListBox();
-            repo_list.selection_mode = SelectionMode.SINGLE;
-            repo_list.add_css_class("navigation-sidebar");
-            // Match the branches list horizontal inset.
-            repo_list.margin_start = 4; repo_list.margin_end = 4;
-            repo_list.row_selected.connect((row) => {
-                if (row == null) return;
-                int idx = row.get_index();
-                if (idx >= 0 && idx < repos.size) select_repo(repos[idx]);
-            });
-            box.append(repo_list);
-
-            var br_lbl = new Label(_("BRANCHES"));
-            br_lbl.add_css_class("git-section-label");
-            br_lbl.halign = Align.START;
-            box.append(br_lbl);
-
-            var br_scroll = new ScrolledWindow();
-            br_scroll.vexpand = true;
-            br_scroll.hscrollbar_policy = PolicyType.NEVER;
-            branches_box = new Box(Orientation.VERTICAL, 2);
-            branches_box.margin_start = 4; branches_box.margin_end = 4;
-            br_scroll.set_child(branches_box);
-            box.append(br_scroll);
-
-            repo_status_lbl = new Label("");
-            repo_status_lbl.add_css_class("caption");
-            repo_status_lbl.add_css_class("dim-label");
-            repo_status_lbl.halign = Align.START;
-            repo_status_lbl.margin_start = 10;
-            repo_status_lbl.margin_top = 6; repo_status_lbl.margin_bottom = 6;
-            repo_status_lbl.ellipsize = Pango.EllipsizeMode.END;
-            box.append(repo_status_lbl);
-
-            return box;
-        }
-
-        private Widget build_center() {
-            var box = new Box(Orientation.VERTICAL, 0);
-            box.width_request = 360;
-
-            // "Working changes" pseudo-entry pinned on top.
-            working_btn = new Button();
-            working_btn.add_css_class("flat");
-            working_btn.add_css_class("git-commit-row");
-            var wb = new Box(Orientation.HORIZONTAL, 8);
-            var wicon = new Image.from_icon_name("document-edit-symbolic");
-            wb.append(wicon);
-            var wlbl = new Label(_("Working Changes"));
-            wlbl.halign = Align.START; wlbl.hexpand = true;
-            wlbl.add_css_class("git-commit-subject");
-            wb.append(wlbl);
-            working_badge = new Label("");
-            working_badge.add_css_class("git-ref-chip");
-            working_badge.visible = false;
-            wb.append(working_badge);
-            working_btn.set_child(wb);
-            working_btn.clicked.connect(() => show_working_changes.begin());
-            box.append(working_btn);
-
-            box.append(new Separator(Orientation.HORIZONTAL));
-
-            var scroll = new ScrolledWindow();
-            scroll.vexpand = true;
-            scroll.hscrollbar_policy = PolicyType.NEVER;
-            commit_list = new ListBox();
-            commit_list.selection_mode = SelectionMode.SINGLE;
-            commit_list.add_css_class("navigation-sidebar");
-            commit_list.row_activated.connect(on_commit_activated);
-            scroll.set_child(commit_list);
-            box.append(scroll);
-
-            return box;
-        }
-
-        private Widget build_details() {
-            var box = new Box(Orientation.VERTICAL, 0);
-            box.margin_top = 5;
-
+        // DiffView is an app-local custom widget (not in the Singularity gir)
+        // and the commit box carries dynamic placeholder logic, so both are
+        // built here and appended into the template's bottom_box.
+        private void build_details_extras() {
             // Kept for downstream `details_title.label = ...` calls but never appended.
             details_title = new Label("");
 
-            // Conflict banner (hidden unless conflicts).
-            conflict_banner = new Box(Orientation.HORIZONTAL, 8);
-            conflict_banner.add_css_class("git-conflict-banner");
-            conflict_banner.margin_start = 12; conflict_banner.margin_end = 12;
-            conflict_banner.visible = false;
-            var cb_icon = new Image.from_icon_name("dialog-warning-symbolic");
-            conflict_banner.append(cb_icon);
-            var cb_lbl = new Label(_("Merge conflicts - resolve files, then stage them."));
-            cb_lbl.halign = Align.START; cb_lbl.hexpand = true;
-            conflict_banner.append(cb_lbl);
-            box.append(conflict_banner);
-
-            // shrink false + resize true on both children makes the Paned start at 50/50.
-            var split = new Paned(Orientation.VERTICAL);
-            split.shrink_start_child = false;
-            split.shrink_end_child   = false;
-            split.resize_start_child = true;
-            split.resize_end_child   = true;
-            split.vexpand = true;
-
-            var files_scroll = new ScrolledWindow();
-            files_scroll.hscrollbar_policy = PolicyType.NEVER;
-            files_scroll.propagate_natural_height = false;
-            files_scroll.vexpand = true;
-            file_list_box = new Box(Orientation.VERTICAL, 1);
-            file_list_box.margin_start = 6; file_list_box.margin_end = 6;
-            files_scroll.set_child(file_list_box);
-            split.set_start_child(files_scroll);
-
-            var bottom_box = new Box(Orientation.VERTICAL, 0);
-            bottom_box.vexpand = true;
             diff_view = new DiffView();
             diff_view.vexpand = true;
             bottom_box.append(diff_view);
@@ -328,11 +215,6 @@ namespace Singularity.Apps.Git {
             cbox.append(crow_wrap);
             commit_revealer.set_child(cbox);
             bottom_box.append(commit_revealer);
-
-            split.set_end_child(bottom_box);
-            box.append(split);
-
-            return box;
         }
 
         // ── Repo management ───────────────────────────────────────────────────

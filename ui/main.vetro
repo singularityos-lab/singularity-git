@@ -1,0 +1,56 @@
+Template(class: "SingularityAppsGitGitWindow", parent: "SingularityWidgetsWindow") {
+    Paned(id: "git_main_root", orientation: "horizontal", position: 280, shrinkStartChild: false) {
+
+        VBox(id: "sidebar_box", widthRequest: 260).asChildType("start") {
+            Label(label: "REPOSITORIES", halign: "start")
+                .cssClass("git-section-label").translatable("label")
+            ListBox(id: "repo_list", selectionMode: "single", marginStart: 4, marginEnd: 4)
+                .cssClass("navigation-sidebar")
+            Label(label: "BRANCHES", halign: "start")
+                .cssClass("git-section-label").translatable("label")
+            ScrolledWindow(id: "br_scroll", vexpand: true, hscrollbarPolicy: "never") {
+                VBox(id: "branches_box", spacing: 2, marginStart: 4, marginEnd: 4)
+            }
+            Label(id: "repo_status_lbl", label: "", halign: "start",
+                  marginStart: 10, marginTop: 6, marginBottom: 6, ellipsize: "end")
+                .cssClass("caption").cssClass("dim-label")
+        }
+
+        Paned(id: "inner_paned", orientation: "horizontal", position: 460).asChildType("end") {
+
+            VBox(id: "center_box", widthRequest: 360).asChildType("start") {
+                Button(id: "working_btn").cssClass("flat").cssClass("git-commit-row") {
+                    HBox(spacing: 8) {
+                        Image(iconName: "document-edit-symbolic")
+                        Label(label: "Working Changes", halign: "start", hexpand: true)
+                            .cssClass("git-commit-subject").translatable("label")
+                        Label(id: "working_badge", label: "", visible: false).cssClass("git-ref-chip")
+                    }
+                }
+                Separator(orientation: "horizontal")
+                ScrolledWindow(id: "commit_scroll", vexpand: true, hscrollbarPolicy: "never") {
+                    ListBox(id: "commit_list", selectionMode: "single")
+                        .cssClass("navigation-sidebar")
+                }
+            }
+
+            VBox(id: "details_box", marginTop: 5).asChildType("end") {
+                HBox(id: "conflict_banner", spacing: 8, marginStart: 12, marginEnd: 12, visible: false)
+                    .cssClass("git-conflict-banner") {
+                    Image(iconName: "dialog-warning-symbolic")
+                    Label(label: "Merge conflicts - resolve files, then stage them.",
+                          halign: "start", hexpand: true).translatable("label")
+                }
+                Paned(id: "split", orientation: "vertical", vexpand: true,
+                      shrinkStartChild: false, shrinkEndChild: false,
+                      resizeStartChild: true, resizeEndChild: true) {
+                    ScrolledWindow(id: "files_scroll", hscrollbarPolicy: "never", vexpand: true)
+                        .asChildType("start") {
+                        VBox(id: "file_list_box", spacing: 1, marginStart: 6, marginEnd: 6)
+                    }
+                    VBox(id: "bottom_box", vexpand: true).asChildType("end")
+                }
+            }
+        }
+    }
+}

@@ -22,6 +22,15 @@ if not meson.is_subproject() and libsingularity_dep.type_name() == 'internal'
   add_project_arguments(['--vapidir=' + libsingularity_vapi_dir], language: 'vala')
 endif
 
+subdir('ui')
+
+resources = gnome.compile_resources(
+  'singularity-git-resources',
+  'resources/dev.sinty.git.gresource.xml',
+  source_dir: [meson.current_source_dir(), meson.current_build_dir()],
+  dependencies: main_ui
+)
+
 sources = files(
   'src/main.vala',
   'src/git_backend.vala',
@@ -32,7 +41,7 @@ sources = files(
 )
 
 executable('singularity-git',
-  sources,
+  sources + [resources],
   dependencies: [gtk_dep, gee_dep, gtksource_dep, libsingularity_dep],
   install: true
 )
