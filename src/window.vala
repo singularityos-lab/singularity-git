@@ -718,6 +718,7 @@ namespace Singularity.Apps.Git {
             var entry = new Entry();
             entry.placeholder_text = _("branch name");
             entry.hexpand = true;
+            Singularity.Widgets.ContextMenu.attach_editable(entry);
             box.append(entry);
 
             var btn_box = new Box(Orientation.HORIZONTAL, 8);
