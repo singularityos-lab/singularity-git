@@ -1,0 +1,8 @@
+[Widget]
+Id=git.repo-status
+ProviderId=dev.sinty.git
+Name=Repository Status
+IconName=dev.sinty.git
+Sizes=2x1
+Module=libsingularity-git-widget.so
+ModuleSymbol=singularity_git_widget_new

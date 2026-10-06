@@ -46,6 +46,16 @@ executable('singularity-git',
   install: true
 )
 
+shared_module('singularity-git-widget',
+  files('widget/repo_status_widget.vala'),
+  dependencies: [gtk_dep, gee_dep, libsingularity_dep, dependency('gio-unix-2.0')],
+  install: true,
+  install_dir: get_option('libdir') / 'singularity' / 'widgets'
+)
+install_data('widget/dev.sinty.git.repo-status.widget',
+  install_dir: get_option('datadir') / 'singularity' / 'widgets'
+)
+
 install_data('data/dev.sinty.git.desktop',
   install_dir: get_option('datadir') / 'applications'
 )

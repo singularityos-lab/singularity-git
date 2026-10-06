@@ -52,6 +52,7 @@ namespace Singularity.Apps.Git {
         private Stack content_stack;
 
         private void build_ui() {
+            setup_actions();
             setup_toolbar();
 
             // The repo/branch/commit lists and the details panes come from
@@ -79,7 +80,7 @@ namespace Singularity.Apps.Git {
             wp.title = _("Git");
             wp.subtitle = _("Branches, commits, diffs and conflicts - across multiple repositories.");
             wp.add_action(
-                "folder-open-symbolic",
+                "folder-open",
                 "Open Repository",
                 "Pick a folder under Git version control\nto inspect its history and changes.",
                 () => on_open_repo()
@@ -97,62 +98,101 @@ namespace Singularity.Apps.Git {
         private Button pull_btn;
         private Button push_btn;
         private Button branch_btn;
+        private Button open_btn;
+        private Button detach_btn;
 
         private void setup_toolbar() {
-            var open_btn = new Button.from_icon_name("folder-open-symbolic");
-            open_btn.tooltip_text = _("Open Repository…");
-            open_btn.add_css_class("flat");
-            open_btn.clicked.connect(on_open_repo);
-            add_bubble_widget(open_btn);
+            open_btn = add_bubble_icon("folder-open-symbolic", _("Open Repository…"), () => on_open_repo());
 
-            refresh_btn = new Button.from_icon_name("view-refresh-symbolic");
-            refresh_btn.tooltip_text = _("Refresh");
-            refresh_btn.add_css_class("flat");
-            refresh_btn.clicked.connect(() => { if (current != null) reload_repo.begin(); });
-            add_bubble_widget(refresh_btn);
+            refresh_btn = add_bubble_icon("view-refresh-symbolic", _("Refresh"),
+                                          () => { if (current != null) reload_repo.begin(); });
 
-            branch_btn = new Button.from_icon_name("list-add-symbolic");
-            branch_btn.tooltip_text = _("New Branch…");
-            branch_btn.add_css_class("flat");
-            branch_btn.clicked.connect(on_new_branch);
-            add_bubble_widget(branch_btn);
+            branch_btn = add_bubble_icon("list-add-symbolic", _("New Branch…"), () => on_new_branch());
 
             // Fetch = sync (mail-send-receive is the reliable sync glyph;
             // emblem-synchronizing-symbolic is missing in the theme, so it
             // renders as tofu/emoji fallback).
-            fetch_btn = new Button.from_icon_name("mail-send-receive-symbolic");
-            fetch_btn.tooltip_text = _("Fetch");
-            fetch_btn.add_css_class("flat");
-            fetch_btn.clicked.connect(() => run_repo_op.begin("fetch"));
-            add_bubble_widget(fetch_btn);
+            fetch_btn = add_bubble_icon("mail-send-receive-symbolic", _("Fetch"), () => run_repo_op.begin("fetch"));
 
-            pull_btn = new Button.from_icon_name("folder-download-symbolic");
-            pull_btn.tooltip_text = _("Pull (fast-forward)");
-            pull_btn.add_css_class("flat");
-            pull_btn.clicked.connect(() => run_repo_op.begin("pull"));
-            add_bubble_widget(pull_btn);
+            pull_btn = add_bubble_icon("folder-download-symbolic", _("Pull (fast-forward)"), () => run_repo_op.begin("pull"));
 
-            push_btn = new Button.from_icon_name("send-to-symbolic");
-            push_btn.tooltip_text = _("Push");
-            push_btn.add_css_class("flat");
-            push_btn.clicked.connect(() => run_repo_op.begin("push"));
-            add_bubble_widget(push_btn);
+            push_btn = add_bubble_icon("send-to-symbolic", _("Push"), () => run_repo_op.begin("push"));
 
-            add_bubble_icon("view-restore-symbolic",
-                            "Open diff in a separate window",
+            detach_btn = add_bubble_icon("view-restore-symbolic",
+                            _("Open diff in a separate window"),
                             () => detach_diff());
 
             update_toolbar_sensitivity();
         }
 
+        private void setup_actions() {
+            var act_open = new SimpleAction("open-repo", null);
+            act_open.activate.connect(() => on_open_repo());
+            add_action(act_open);
+
+            var act_refresh = new SimpleAction("refresh", null);
+            act_refresh.activate.connect(() => { if (current != null) reload_repo.begin(); });
+            add_action(act_refresh);
+
+            var act_branch = new SimpleAction("new-branch", null);
+            act_branch.activate.connect(() => on_new_branch());
+            add_action(act_branch);
+
+            var act_fetch = new SimpleAction("fetch", null);
+            act_fetch.activate.connect(() => run_repo_op.begin("fetch"));
+            add_action(act_fetch);
+
+            var act_pull = new SimpleAction("pull", null);
+            act_pull.activate.connect(() => run_repo_op.begin("pull"));
+            add_action(act_pull);
+
+            var act_push = new SimpleAction("push", null);
+            act_push.activate.connect(() => run_repo_op.begin("push"));
+            add_action(act_push);
+
+            var act_detach = new SimpleAction("detach-diff", null);
+            act_detach.activate.connect(() => detach_diff());
+            add_action(act_detach);
+
+            var act_close_repo = new SimpleAction("close-repo", null);
+            act_close_repo.activate.connect(() => { if (current != null) close_repo(current); });
+            add_action(act_close_repo);
+
+            var act_working = new SimpleAction("show-working", null);
+            act_working.activate.connect(() => show_working_changes.begin());
+            add_action(act_working);
+
+            var act_stage_all = new SimpleAction("stage-all", null);
+            act_stage_all.activate.connect(stage_all);
+            add_action(act_stage_all);
+
+            var act_commit = new SimpleAction("commit", null);
+            act_commit.activate.connect(on_commit);
+            add_action(act_commit);
+
+            var act_close = new SimpleAction("close", null);
+            act_close.activate.connect(() => close());
+            add_action(act_close);
+        }
+
         // Hide repo actions when there's no open repository.
         private void update_toolbar_sensitivity() {
             bool has = (current != null);
+            foreach (string name in new string[] { "refresh", "new-branch", "fetch", "pull", "push", "detach-diff", "close-repo", "show-working" }) {
+                var act = lookup_action(name) as SimpleAction;
+                if (act != null) act.set_enabled(has);
+            }
+            foreach (string name in new string[] { "stage-all", "commit" }) {
+                var act = lookup_action(name) as SimpleAction;
+                if (act != null) act.set_enabled(has && mode == ViewMode.WORKING);
+            }
             if (refresh_btn != null) refresh_btn.visible = has;
             if (fetch_btn != null)   fetch_btn.visible = has;
             if (pull_btn != null)    pull_btn.visible = has;
             if (push_btn != null)    push_btn.visible = has;
             if (branch_btn != null)  branch_btn.visible = has;
+            if (open_btn != null)    open_btn.visible = has;
+            if (detach_btn != null)  detach_btn.visible = has;
         }
 
         // DiffView is an app-local custom widget (not in the Singularity gir)
@@ -178,7 +218,7 @@ namespace Singularity.Apps.Git {
             // buffer has text. GtkTextView has no placeholder property.
             var commit_overlay = new Overlay();
             commit_overlay.set_child(commit_msg);
-            var commit_placeholder = new Label(_("Write a commit message..."));
+            var commit_placeholder = new Label(_("Write a commit message…"));
             commit_placeholder.add_css_class("dim-label");
             commit_placeholder.halign = Align.START;
             commit_placeholder.valign = Align.START;
@@ -199,11 +239,7 @@ namespace Singularity.Apps.Git {
             crow_wrap.margin_bottom = 6;
             var crow = new Box(Orientation.HORIZONTAL, 8);
             var stage_all_btn = new Button.with_label(_("Stage All"));
-            stage_all_btn.clicked.connect(() => {
-                if (current != null) current.stage_all.begin((o, r) => {
-                    current.stage_all.end(r); show_working_changes.begin();
-                });
-            });
+            stage_all_btn.clicked.connect(stage_all);
             crow.append(stage_all_btn);
             var spacer = new Box(Orientation.HORIZONTAL, 0); spacer.hexpand = true;
             crow.append(spacer);
@@ -237,7 +273,7 @@ namespace Singularity.Apps.Git {
                     if (detail == "" && disc.exit_code < 0)
                         detail = "Could not run git (is it installed and on PATH?)";
                     if (detail == "") detail = "No Git repositories found here.";
-                    show_error("Can't open repository", "%s\n\n%s".printf(p, detail));
+                    show_error(_("Can't Open Repository"), "%s\n\n%s".printf(p, detail));
                     return;
                 }
                 found.add(top);
@@ -245,6 +281,7 @@ namespace Singularity.Apps.Git {
 
             GitRepo? to_select = null;
             foreach (var top in found) {
+                remember_recent(top);
                 GitRepo? existing = null;
                 foreach (var r in repos) if (r.path == top) { existing = r; break; }
                 if (existing != null) {
@@ -258,6 +295,15 @@ namespace Singularity.Apps.Git {
                 if (to_select == null) to_select = repo;
             }
             if (to_select != null) select_repo(to_select);
+        }
+
+        private static void remember_recent(string path) {
+            Gtk.RecentManager.get_default().add_full(File.new_for_path(path).get_uri(), Gtk.RecentData() {
+                display_name = Path.get_basename(path),
+                mime_type = "inode/directory",
+                app_name = "singularity-git",
+                app_exec = "singularity-git %u"
+            });
         }
 
         // Recursively collect repository roots (directories containing a .git)
@@ -472,6 +518,7 @@ namespace Singularity.Apps.Git {
             if (current == null) return;
             mode = ViewMode.COMMIT;
             selected_commit = hash;
+            update_toolbar_sensitivity();
             commit_revealer.reveal_child = false;
             conflict_banner.visible = false;
             working_badge.visible = working_badge.visible; // unchanged
@@ -493,6 +540,7 @@ namespace Singularity.Apps.Git {
             if (current == null) return;
             mode = ViewMode.WORKING;
             selected_commit = null;
+            update_toolbar_sensitivity();
             details_title.label = _("Working Changes");
             commit_revealer.reveal_child = true;
 
@@ -632,6 +680,12 @@ namespace Singularity.Apps.Git {
         }
 
         // ── Actions ───────────────────────────────────────────────────────────
+        private void stage_all() {
+            if (current != null) current.stage_all.begin((o, r) => {
+                current.stage_all.end(r); show_working_changes.begin();
+            });
+        }
+
         private void on_commit() {
             if (current == null) return;
             TextIter s, e;
@@ -662,6 +716,10 @@ namespace Singularity.Apps.Git {
         // response - so the dialog opens, you pick a folder, and nothing
         // happens ("rimane muto").
         private Gtk.FileChooserNative? _open_dialog = null;
+
+        public void choose_repository() {
+            on_open_repo();
+        }
 
         private void on_open_repo() {
             _open_dialog = new Gtk.FileChooserNative(
@@ -726,6 +784,7 @@ namespace Singularity.Apps.Git {
             var cancel = new Button.with_label(_("Cancel"));
             cancel.add_css_class("flat");
             cancel.clicked.connect(() => dialog.close());
+            dialog.set_cancel_button(cancel);
             var create = new Button.with_label(_("Create & Checkout"));
             create.add_css_class("suggested-action");
             create.clicked.connect(() => {
@@ -733,7 +792,7 @@ namespace Singularity.Apps.Git {
                 if (name == "") return;
                 current.create_branch.begin(name, true, (o, r) => {
                     var res = current.create_branch.end(r);
-                    if (!res.ok) show_error("Branch failed", res.stderr_text.strip());
+                    if (!res.ok) show_error(_("Branch Failed"), res.stderr_text.strip());
                 });
                 dialog.close();
             });
@@ -801,10 +860,9 @@ namespace Singularity.Apps.Git {
         // Visible, dismissable error (used for repo-open failures etc.).
         private void show_error(string title, string detail) {
             warning("git: %s - %s", title, detail);
-            var dlg = new Gtk.AlertDialog("%s", title);
-            dlg.set_detail(detail);
-            dlg.set_modal(true);
-            dlg.show(this);
+            var dlg = new ConfirmDialog.message ((Gtk.Application) application, title, "dialog-error-symbolic", detail, _("Close"));
+            dlg.transient_for = this;
+            dlg.present();
         }
     }
 }

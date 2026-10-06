@@ -37,7 +37,6 @@ namespace Singularity.Apps.Git {
         private Button stage_btn;
         private Button unstage_btn;
         private Button restore_btn;
-        private Box _actions_sep;
 
         public DiffWindow(Gtk.Application app, GitRepo repo, string? commit,
                           string title, Gee.ArrayList<DiffFileRef> files) {
@@ -47,10 +46,6 @@ namespace Singularity.Apps.Git {
             this.files = files;
             set_title(title);
             set_default_size(1100, 760);
-
-            // No toolbar: floating bubbles instead (drag + close).
-            flat = true;
-            show_close = false;
 
             var paned = new Paned(Orientation.HORIZONTAL);
             paned.position = 300;
@@ -82,57 +77,13 @@ namespace Singularity.Apps.Git {
             diff_view = new DiffView();
             paned.set_end_child(diff_view);
 
-            // Floating bubbles over the whole thing.
-            var hover = new HoverControls();
-            hover.set_content(paned);
+            edit_btn = add_bubble_icon("document-edit-symbolic", _("Edit in editor"),
+                                       () => { if (selected != null) open_in_editor(selected.path); });
+            stage_btn = add_bubble_icon("list-add-symbolic", _("Stage"), () => act_stage());
+            unstage_btn = add_bubble_icon("list-remove-symbolic", _("Unstage"), () => act_unstage());
+            restore_btn = add_bubble_icon("edit-undo-symbolic", _("Restore (discard changes)"), () => act_restore());
 
-            // Working-change actions live in the bubbles, before the drag/close.
-            edit_btn = new Button.from_icon_name("document-edit-symbolic");
-            edit_btn.tooltip_text = _("Edit in editor");
-            edit_btn.clicked.connect(() => { if (selected != null) open_in_editor(selected.path); });
-            hover.add_control(edit_btn);
-
-            stage_btn = new Button.from_icon_name("list-add-symbolic");
-            stage_btn.tooltip_text = _("Stage");
-            stage_btn.clicked.connect(() => act_stage());
-            hover.add_control(stage_btn);
-
-            unstage_btn = new Button.from_icon_name("list-remove-symbolic");
-            unstage_btn.tooltip_text = _("Unstage");
-            unstage_btn.clicked.connect(() => act_unstage());
-            hover.add_control(unstage_btn);
-
-            restore_btn = new Button.from_icon_name("edit-undo-symbolic");
-            restore_btn.tooltip_text = _("Restore (discard changes)");
-            restore_btn.clicked.connect(() => act_restore());
-            hover.add_control(restore_btn);
-
-            // Separator between the actions and the drag/close bubbles. Added as
-            // a control so we can hide it (with the actions) in commit view.
-            _actions_sep = new Box(Orientation.HORIZONTAL, 0);
-            hover.add_control(_actions_sep);
-            _actions_sep.remove_css_class("singularity-hover-btn");
-            _actions_sep.add_css_class("singularity-hover-sep");
-
-            var grip = new Button.from_icon_name("list-drag-handle-symbolic");
-            grip.tooltip_text = _("Drag Window");
-            var grip_drag = new Gtk.GestureDrag();
-            grip_drag.drag_begin.connect((x, y) => {
-                var surface = get_surface();
-                if (surface is Gdk.Toplevel)
-                    ((Gdk.Toplevel) surface).begin_move(grip_drag.get_device(), 1, x, y, Gdk.CURRENT_TIME);
-            });
-            grip.add_controller(grip_drag);
-            hover.add_control(grip);
-
-            hover.add_separator();
-
-            var close_btn = new Button.from_icon_name("window-close-symbolic");
-            close_btn.tooltip_text = _("Close");
-            close_btn.clicked.connect(() => close());
-            hover.add_control(close_btn);
-
-            set_content(hover);
+            set_content(paned);
 
             // Populate + show the first file's diff.
             update_actions(); // hidden until a working-change row is selected
@@ -212,7 +163,6 @@ namespace Singularity.Apps.Git {
         // A commit's files are historical, so all actions stay hidden there.
         private void update_actions() {
             bool editable = (selected != null && selected.kind != "commit");
-            _actions_sep.visible = editable;
             edit_btn.visible = editable;
             if (!editable) {
                 stage_btn.visible = false;

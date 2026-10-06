@@ -8,3 +8,9 @@ Type=Application
 Categories=Development;RevisionControl;
 StartupNotify=true
 StartupWMClass=dev.sinty.git
+X-Singularity-Dock-Recent=true
+Actions=open-repository;
+
+[Desktop Action open-repository]
+Name=Open Repository
+Exec=singularity-git --open-repository

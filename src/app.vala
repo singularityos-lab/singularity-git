@@ -10,6 +10,8 @@ namespace Singularity.Apps.Git {
         public GitApp() {
             base("dev.sinty.git",
                  ApplicationFlags.HANDLES_OPEN | ApplicationFlags.HANDLES_COMMAND_LINE);
+            add_main_option("open-repository", 0, OptionFlags.NONE, OptionArg.NONE,
+                            _("Choose a repository to open"), null);
         }
 
         protected override void startup() {
@@ -20,6 +22,71 @@ namespace Singularity.Apps.Git {
             if (disp != null)
                 Gtk.StyleContext.add_provider_for_display(
                     disp, prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            setup_menu();
+        }
+
+        private void setup_menu() {
+            var menu = new GLib.Menu();
+
+            var file_menu = new GLib.Menu();
+            var f1 = new GLib.Menu();
+            f1.append(_("Open Repository…"), "win.open-repo");
+            f1.append(_("Close Repository"), "win.close-repo");
+            file_menu.append_section(null, f1);
+            var f2 = new GLib.Menu();
+            f2.append(_("Close Window"), "win.close");
+            f2.append(_("Quit"), "app.quit");
+            file_menu.append_section(null, f2);
+            menu.append_submenu(_("File"), file_menu);
+
+            var edit_menu = new GLib.Menu();
+            edit_menu.append(_("Settings"), "app.settings");
+            menu.append_submenu(_("Edit"), edit_menu);
+
+            var view_menu = new GLib.Menu();
+            var v1 = new GLib.Menu();
+            v1.append(_("Working Changes"), "win.show-working");
+            v1.append(_("Open Diff in New Window"), "win.detach-diff");
+            view_menu.append_section(null, v1);
+            var v2 = new GLib.Menu();
+            v2.append(_("Refresh"), "win.refresh");
+            view_menu.append_section(null, v2);
+            menu.append_submenu(_("View"), view_menu);
+
+            var repo_menu = new GLib.Menu();
+            var sync = new GLib.Menu();
+            sync.append(_("Fetch"), "win.fetch");
+            sync.append(_("Pull"), "win.pull");
+            sync.append(_("Push"), "win.push");
+            repo_menu.append_section(null, sync);
+            var changes = new GLib.Menu();
+            changes.append(_("Stage All"), "win.stage-all");
+            changes.append(_("Commit"), "win.commit");
+            repo_menu.append_section(null, changes);
+            var extra = new GLib.Menu();
+            extra.append(_("New Branch…"), "win.new-branch");
+            repo_menu.append_section(null, extra);
+            menu.append_submenu(_("Repository"), repo_menu);
+
+            set_menubar(menu);
+
+            var settings_action = new SimpleAction("settings", null);
+            settings_action.activate.connect(() => {
+                try {
+                    Singularity.Shell.ShellService shell = Bus.get_proxy_sync(
+                        BusType.SESSION, "dev.sinty.desktop", "/dev/sinty/Shell");
+                    shell.open_app_settings("dev.sinty.git");
+                } catch (Error e) {
+                    warning("Failed to open settings: %s", e.message);
+                }
+            });
+            add_action(settings_action);
+
+            set_accels_for_action("win.open-repo", { "<Control>o" });
+            set_accels_for_action("win.close", { "<Control>w" });
+            set_accels_for_action("win.refresh", { "<Control>r", "F5" });
+            set_accels_for_action("win.commit", { "<Control>Return" });
+            set_accels_for_action("app.settings", { "<Control>comma" });
         }
 
         protected override void activate() {
@@ -40,6 +107,8 @@ namespace Singularity.Apps.Git {
                 window.open_repo_at.begin(f.get_path());
             }
             window.present();
+            if (cl.get_options_dict().contains("open-repository"))
+                window.choose_repository();
             return 0;
         }
 
@@ -70,18 +139,18 @@ namespace Singularity.Apps.Git {
                              margin: 10px 8px 4px 8px; }
         .git-file-row { padding: 3px 8px; border-radius: 6px; }
         .git-file-row:hover { background-color: alpha(@window_fg_color, 0.08); }
-        .git-state-M { color: #e0a000; }
-        .git-state-A { color: #33b35a; }
-        .git-state-D { color: #e05c5c; }
-        .git-state-U { color: #e05c5c; font-weight: 700; }
-        .git-state-untracked { color: #888; }
-        .diff-add  { background-color: alpha(#33b35a, 0.18); }
-        .diff-del  { background-color: alpha(#e05c5c, 0.18); }
-        .diff-hunk { color: #3584e4; }
+        .git-state-M { color: @warning_color; }
+        .git-state-A { color: @success_color; }
+        .git-state-D { color: @error_color; }
+        .git-state-U { color: @error_color; font-weight: 700; }
+        .git-state-untracked { color: alpha(@text_color, 0.55); }
+        .diff-add  { background-color: alpha(@success_color, 0.18); }
+        .diff-del  { background-color: alpha(@error_color, 0.18); }
+        .diff-hunk { color: @accent_color; }
         .git-commit-box { border-top: 1px solid alpha(@window_fg_color, 0.12); }
         .git-toolbar-pill { background-color: alpha(@window_fg_color, 0.08);
                             border-radius: 999px; padding: 2px; }
-        .git-conflict-banner { background-color: alpha(#e05c5c, 0.18);
+        .git-conflict-banner { background-color: alpha(@error_color, 0.18);
                                border-radius: 10px; padding: 8px 12px; }
         """;
     }
