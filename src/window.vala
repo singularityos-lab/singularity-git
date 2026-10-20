@@ -1,5 +1,6 @@
 using Gtk;
 using GLib;
+using Singularity.Git;
 using Gee;
 using Singularity;
 using Singularity.Widgets;

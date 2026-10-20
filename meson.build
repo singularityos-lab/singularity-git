@@ -33,8 +33,6 @@ resources = gnome.compile_resources(
 
 sources = files(
   'src/main.vala',
-  'src/git_backend.vala',
-  'src/diff_view.vala',
   'src/diff_window.vala',
   'src/window.vala',
   'src/app.vala',
