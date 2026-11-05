@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=dev.sinty.git
+Exec=@bindir@/singularity-git --gapplication-service

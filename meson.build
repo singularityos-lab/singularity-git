@@ -61,3 +61,13 @@ install_data('data/dev.sinty.git.desktop',
 install_data('data/icons/dev.sinty.git.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps'
 )
+
+git_service_conf = configuration_data()
+git_service_conf.set('bindir', get_option('prefix') / get_option('bindir'))
+configure_file(
+  input: 'data/dev.sinty.git.service.in',
+  output: 'dev.sinty.git.service',
+  configuration: git_service_conf,
+  install: true,
+  install_dir: get_option('datadir') / 'dbus-1' / 'services'
+)
