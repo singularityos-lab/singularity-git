@@ -24,6 +24,7 @@ namespace Singularity.Apps.Git {
                 Gtk.StyleContext.add_provider_for_display(
                     disp, prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
             setup_menu();
+            GitIntents.install(this);
         }
 
         private void setup_menu() {
@@ -118,6 +119,12 @@ namespace Singularity.Apps.Git {
             foreach (var f in files)
                 window.open_repo_at.begin(f.get_path());
             window.present();
+        }
+
+        public GitWindow shown_window() {
+            ensure_window();
+            window.present();
+            return window;
         }
 
         private void ensure_window() {

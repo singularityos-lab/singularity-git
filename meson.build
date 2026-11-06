@@ -36,6 +36,7 @@ sources = files(
   'src/diff_window.vala',
   'src/window.vala',
   'src/app.vala',
+  'src/agent_intents.vala',
 )
 
 executable('singularity-git',

@@ -255,6 +255,18 @@ namespace Singularity.Apps.Git {
         }
 
         // ── Repo management ───────────────────────────────────────────────────
+        public GitRepo? current_repo { get { return current; } }
+        public Gee.List<GitRepo> open_repos { get { return repos; } }
+
+        public GitRepo? find_repo(string top) {
+            foreach (var r in repos) if (r.path == top) return r;
+            return null;
+        }
+
+        public void show_repo(GitRepo repo) {
+            if (current != repo) select_repo(repo);
+        }
+
         public async void open_repo_at(string? p) {
             if (p == null) return;
 
