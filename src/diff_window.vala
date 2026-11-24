@@ -91,6 +91,27 @@ namespace Singularity.Apps.Git {
             populate();
         }
 
+        public static DiffWindow from_migration(Gtk.Application app, GitRepo repo, Variant data) {
+            var files = new Gee.ArrayList<DiffFileRef>();
+            var it = data.get_child_value(3).iterator();
+            string path, kind;
+            int state;
+            while (it.next("(sis)", out path, out state, out kind)) files.add(new DiffFileRef(path, (FileState) state, kind));
+            string commit = data.get_child_value(1).get_string();
+            return new DiffWindow(app, repo, commit != "" ? commit : null, data.get_child_value(2).get_string(), files);
+        }
+
+        public Variant save_migration() {
+            var list = new VariantBuilder(new VariantType("a(sis)"));
+            foreach (var f in files) list.add("(sis)", f.path, (int) f.state, f.kind);
+            return new Variant.tuple({
+                new Variant.string(Singularity.Migration.portable_path(File.new_for_path(repo.path))),
+                new Variant.string(commit ?? ""),
+                new Variant.string(title ?? ""),
+                list.end()
+            });
+        }
+
         private void populate() {
             string? cur_kind = null;
             ListBoxRow? first_file_row = null;

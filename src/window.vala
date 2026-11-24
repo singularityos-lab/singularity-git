@@ -61,7 +61,7 @@ namespace Singularity.Apps.Git {
             repo_list.row_selected.connect((row) => {
                 if (row == null) return;
                 int idx = row.get_index();
-                if (idx >= 0 && idx < repos.size) select_repo(repos[idx]);
+                if (idx >= 0 && idx < repos.size && repos[idx] != current) select_repo(repos[idx]);
             });
             commit_list.row_activated.connect(on_commit_activated);
             working_btn.clicked.connect(() => show_working_changes.begin());
@@ -301,13 +301,50 @@ namespace Singularity.Apps.Git {
                     if (to_select == null) to_select = existing;
                     continue;
                 }
-                var repo = new GitRepo(top);
-                repo.changed.connect(() => { if (current == repo) reload_repo.begin(); });
-                repos.add(repo);
-                add_repo_row(repo);
+                var repo = add_repo(top);
                 if (to_select == null) to_select = repo;
             }
             if (to_select != null) select_repo(to_select);
+        }
+
+        private GitRepo add_repo(string top) {
+            var repo = new GitRepo(top);
+            repo.changed.connect(() => { if (current == repo) reload_repo.begin(); });
+            repos.add(repo);
+            add_repo_row(repo);
+            return repo;
+        }
+
+        public Variant save_migration() {
+            var paths = new VariantBuilder(new VariantType("as"));
+            foreach (var r in repos) paths.add("s", Singularity.Migration.portable_path(File.new_for_path(r.path)));
+            var d = new VariantDict();
+            d.insert_value("repos", paths.end());
+            d.insert_value("current", new Variant.string(current != null ? Singularity.Migration.portable_path(File.new_for_path(current.path)) : ""));
+            d.insert_value("commit", new Variant.string(mode == ViewMode.COMMIT && selected_commit != null ? selected_commit : ""));
+            return d.end();
+        }
+
+        public async void restore_migration(Variant data) {
+            var d = new VariantDict(data);
+            foreach (string p in (d.lookup_value("repos", VariantType.STRING_ARRAY) ?? new Variant.strv({})).get_strv()) {
+                string? path = Singularity.Migration.local_file(p).get_path();
+                if (path != null && find_repo(path) == null && FileUtils.test(Path.build_filename(path, ".git"), FileTest.EXISTS)) add_repo(path);
+            }
+            string commit = (d.lookup_value("commit", VariantType.STRING) ?? new Variant.string("")).get_string();
+            if (commit != "") {
+                mode = ViewMode.COMMIT;
+                selected_commit = commit;
+            }
+            string wanted = (d.lookup_value("current", VariantType.STRING) ?? new Variant.string("")).get_string();
+            string? top = wanted != "" ? Singularity.Migration.local_file(wanted).get_path() : null;
+            GitRepo? repo = top != null ? find_repo(top) : null;
+            if (repo == null && repos.size > 0) repo = repos[0];
+            if (repo != null) {
+                focus_repo(repo);
+                yield reload_repo();
+            }
+            show_main();
         }
 
         private static void remember_recent(string path) {
@@ -381,6 +418,11 @@ namespace Singularity.Apps.Git {
         }
 
         private void select_repo(GitRepo repo) {
+            focus_repo(repo);
+            reload_repo.begin();
+        }
+
+        private void focus_repo(GitRepo repo) {
             current = repo;
             set_title(_("Git - ") + repo.display_name);
             // sync sidebar selection highlight
@@ -389,7 +431,6 @@ namespace Singularity.Apps.Git {
             if (row != null) repo_list.select_row(row);
             update_toolbar_sensitivity();
             show_main();
-            reload_repo.begin();
         }
 
         private bool _reloading = false;
@@ -424,6 +465,9 @@ namespace Singularity.Apps.Git {
             if (st.ahead > 0) s += "  ↑%d".printf(st.ahead);
             if (st.behind > 0) s += "  ↓%d".printf(st.behind);
             repo_status_lbl.label = s;
+            int total = st.staged.size + st.unstaged.size + st.untracked.size + st.conflicts.size;
+            working_badge.label = total.to_string();
+            working_badge.visible = total > 0;
         }
 
         private void append_branch_section(string title, Gee.ArrayList<BranchInfo> bs, bool remote) {
@@ -475,7 +519,9 @@ namespace Singularity.Apps.Git {
             if (current == null) return;
             var commits = yield current.log(500);
             foreach (var c in commits) {
-                commit_list.append(make_commit_row(c));
+                var row = (ListBoxRow) make_commit_row(c);
+                commit_list.append(row);
+                if (mode == ViewMode.COMMIT && c.hash == selected_commit) commit_list.select_row(row);
             }
         }
 

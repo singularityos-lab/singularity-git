@@ -5,7 +5,7 @@ using Singularity;
 
 namespace Singularity.Apps.Git {
 
-    public class GitApp : Singularity.Application {
+    public class GitApp : Singularity.Application, Singularity.Migration.Migratable {
         private GitWindow? window = null;
 
         public GitApp() {
@@ -128,7 +128,48 @@ namespace Singularity.Apps.Git {
         }
 
         private void ensure_window() {
-            if (window == null) window = new GitWindow(this);
+            if (window == null) adopt(new GitWindow(this));
+        }
+
+        private void adopt(GitWindow w) {
+            window = w;
+            w.close_request.connect(() => {
+                if (window == w) window = null;
+                return false;
+            });
+        }
+
+        public Variant save_model() {
+            return new VariantDict().end();
+        }
+
+        public async void restore_model(Variant model) throws Error {
+        }
+
+        public string window_kind(Gtk.Window w) {
+            if (w is GitWindow) return "git";
+            if (w is DiffWindow) return "diff";
+            return "";
+        }
+
+        public Variant save_window(Gtk.Window w) {
+            if (w is DiffWindow) return ((DiffWindow) w).save_migration();
+            return ((GitWindow) w).save_migration();
+        }
+
+        public async Gtk.Window? rebuild_window(string kind, Variant data) throws Error {
+            if (kind == "diff") {
+                string? top = Singularity.Migration.local_file(data.get_child_value(0).get_string()).get_path();
+                if (top == null || !FileUtils.test(Path.build_filename(top, ".git"), FileTest.EXISTS)) return null;
+                GitRepo? repo = window != null ? window.find_repo(top) : null;
+                return DiffWindow.from_migration(this, repo ?? new GitRepo(top), data);
+            }
+            if (kind != "git") return null;
+            if (window != null) window.destroy();
+            var w = new GitWindow(this);
+            adopt(w);
+            yield w.restore_migration(data);
+            return w;
         }
 
         private const string STYLE = """
