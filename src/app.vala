@@ -5,7 +5,7 @@ using Singularity;
 
 namespace Singularity.Apps.Git {
 
-    public class GitApp : Singularity.Application, Singularity.Migration.Migratable {
+    public class GitApp : Singularity.Application, Singularity.Migration.Migratable, Singularity.Startup.Bootable {
         private GitWindow? window = null;
 
         public GitApp() {
@@ -91,12 +91,50 @@ namespace Singularity.Apps.Git {
             set_accels_for_action("app.settings", { "<Control>comma" });
         }
 
-        protected override void activate() {
+        public Singularity.Startup.Plan build_plan(Singularity.Startup.Request request) {
+            var plan = new Singularity.Startup.Plan();
+            plan.version = "git-1";
+            if (request.kind == Singularity.Startup.RequestKind.SERVICE) {
+                plan.main("ready", Singularity.Startup.Category.PREPARE, (c) => {})
+                    .reaches(Singularity.Startup.Milestone.SHELL_READY)
+                    .reaches(Singularity.Startup.Milestone.CONTENT_READY)
+                    .reaches(Singularity.Startup.Milestone.INTERACTIVE);
+                return plan;
+            }
+            plan.main("window", Singularity.Startup.Category.SHELL, (c) => {
+                if (request.kind == Singularity.Startup.RequestKind.OPEN) open_files(request.files());
+                else show_window();
+                c.window = window;
+            }).reaches(Singularity.Startup.Milestone.SHELL_READY)
+              .reaches(Singularity.Startup.Milestone.CONTENT_READY)
+              .reaches(Singularity.Startup.Milestone.INTERACTIVE);
+            return plan;
+        }
+
+        public void handle_request(Singularity.Startup.Request request) {
+            if (request.kind == Singularity.Startup.RequestKind.OPEN) open_files(request.files());
+            else show_window();
+        }
+
+        private void show_window() {
             ensure_window();
             window.present();
         }
 
+        private bool launches_plainly(ApplicationCommandLine cl) {
+            if (cl.get_options_dict().contains("open-repository")) return false;
+            var args = cl.get_arguments();
+            for (int i = 1; i < args.length; i++) {
+                if (!args[i].has_prefix("--")) return false;
+            }
+            return true;
+        }
+
         public override int command_line(ApplicationCommandLine cl) {
+            if (launches_plainly(cl)) {
+                activate();
+                return 0;
+            }
             ensure_window();
             string cwd = cl.get_cwd() ?? Environment.get_current_dir();
             var args = cl.get_arguments();
@@ -114,7 +152,7 @@ namespace Singularity.Apps.Git {
             return 0;
         }
 
-        public override void open(File[] files, string hint) {
+        private void open_files(File[] files) {
             ensure_window();
             foreach (var f in files)
                 window.open_repo_at.begin(f.get_path());
